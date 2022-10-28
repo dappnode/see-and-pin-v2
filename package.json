@@ -1,0 +1,21 @@
+{
+  "devDependencies": {
+    "@types/minimist": "^1.2.2",
+    "@types/web3": "^1.2.2",
+    "typescript": "^4.8.2",
+    "prettier": "^2.7.1"
+  },
+  "scripts": {
+    "start:dev": "nodemon",
+    "build": "tsc",
+    "start": "node build/index.js",
+    "prettier": "prettier --write 'src/**/*.*'"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "@pinata/sdk": "^1.1.26",
+    "axios": "^0.27.2",
+    "minimist": "^1.2.6",
+    "web3": "^1.7.5"
+  }
+}
