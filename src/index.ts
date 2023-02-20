@@ -21,7 +21,7 @@ import { pinToIPFS } from "./ipfs";
 async function pinPackages(pkgs: DAppNodePackageVersion[]) {
   for (const pkg of pkgs) {
     pinToIPFS(pkg);
-    await new Promise((r) => setTimeout(r, 126));
+    await new Promise((r) => setTimeout(r, 1000));
   }
 }
 

@@ -7,11 +7,11 @@ async function pinToIPFS(pkg: DAppNodePackageVersion) {
     await axios({
       method: "post",
       url: `${ipfsUrl}/api/v0/pin/add/${pkg.hash}`,
-      timeout: 10000,
+      timeout: 30000,
     });
     console.log(`Pinned ${pkg.name} with hash: ${pkg.hash}`);
   } catch (e) {
-    console.log("Could not pin", pkg.name);
+    console.log("Could not pin", pkg.name, e);
   }
 }
 
