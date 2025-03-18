@@ -1,76 +1,81 @@
 import { DAppNodePackage, DAppNodePackageVersion } from "../types";
-import Web3 from "web3";
-import { pinToIPFS } from "../ipfs";
+import { explorerGraphURL, fetchGraphQL } from "../utils";
+interface LastVersionResponse {
+  data: {
+    repos: {
+      lastVersion: {
+        semanticVersion: string;
+        contentUri: string;
+      }
+    }[]
+  }
+}
 
-const repoAbi = require("../../abi/Repo_metadata.json");
+interface VersionResponse {
+  data: {
+    repos: {
+      versions: {
+        semanticVersion: string;
+        contentUri: string;
+      }[]
+    }[]
+  }
+}
 
 async function getLatestPackageVersion(
-  web3: Web3,
   pkg: DAppNodePackage
 ): Promise<DAppNodePackageVersion | undefined> {
-  const repoContract = new web3.eth.Contract(repoAbi, pkg.address);
-  try {
-    const len = await repoContract.methods.getVersionsCount().call();
-    const result = await repoContract.methods.getByVersionId(len).call();
 
-    return {
-      hash: web3.utils.hexToUtf8(result["contentURI"]).slice(6),
-      version: result["semanticVersion"].join("."),
-      name: pkg.name,
-    };
-  } catch (e) {
-    console.warn("Could not find latest version for " + pkg.name);
+  const [name, ...registry] = pkg.name.split(".");
+  const LAST_VERSION = `
+  query {
+    repos(where: {name: "${name}" registryName: "${registry.join(".")}"}) {
+      lastVersion {
+        semanticVersion
+        contentUri
+      }
+    }
   }
+  `;
+
+  const result = await fetchGraphQL<LastVersionResponse>(explorerGraphURL, LAST_VERSION);
+  if(!result || result.data.repos.length == 0) return undefined;
+  const lastVersion = result?.data?.repos[0].lastVersion;
+  if(!lastVersion) return undefined;
+  return {
+    name: pkg.name,
+    version: lastVersion.semanticVersion,
+    hash: lastVersion.contentUri.slice(6)
+  } as DAppNodePackageVersion;
+
 }
 
 async function getPackageVersions(
-  web3: Web3,
   pkg: DAppNodePackage,
-  maxVersions: number = 0
 ): Promise<DAppNodePackageVersion[]> {
-  const repoContract = new web3.eth.Contract(repoAbi, pkg.address);
-  const len = await repoContract.methods.getVersionsCount().call();
-  const versions: DAppNodePackageVersion[] = [];
-  if (maxVersions == 0) maxVersions = len - 1;
-  for (var i = Math.max(1, len - maxVersions); i <= len; i++) {
-    const result = await repoContract.methods.getByVersionId(i).call();
-    try {
-      versions.push({
-        hash: web3.utils.hexToUtf8(result["contentURI"]).slice(6),
-        version: result["semanticVersion"].join("."),
-        name: pkg.name,
-      });
-    } catch (e) {}
+  const [name, ...registry] = pkg.name.split(".");
+  const VERSIONS = `
+  query {
+    repos(where: {name: "${name}" registryName: "${registry.join(".")}"}) {
+      versions {
+        semanticVersion
+        contentUri
+      }
+    }
   }
-  return versions;
+  `;
+  const result = await fetchGraphQL<VersionResponse>(explorerGraphURL, VERSIONS);
+  const versions = result?.data.repos[0].versions;
+  if(!versions) return [];
+  return versions.map(v => ({
+    name: pkg.name,
+    version: v.semanticVersion,
+    hash: v.contentUri.slice(6)
+  }) as DAppNodePackageVersion)
 }
 
-async function listenForPackageVersionsAndPin(
-  web3: Web3,
-  pkg: DAppNodePackage,
-  skipPinning: boolean
-) {
-  const contract = new web3.eth.Contract(repoAbi, pkg.address);
-  console.log("Starting to listen for %s versions", pkg.name);
-  contract.events.NewVersion().on("data", async (e: any) => {
-    const semVersion = e["returnValues"]["semanticVersion"];
-    console.log("Got new %s version: %s", pkg.name, semVersion.join("."));
-    const result = await contract.methods
-      .getBySemanticVersion(semVersion)
-      .call();
-    const multihash = web3.utils.hexToUtf8(result["contentURI"]).slice(6);
-    if (skipPinning) return;
-    await pinToIPFS({
-      name: pkg.name,
-      version: semVersion.join("."),
-      hash: multihash,
-    });
-    console.log("Pinned!");
-  });
-}
 
 export {
   getLatestPackageVersion,
   getPackageVersions,
-  listenForPackageVersionsAndPin,
 };
