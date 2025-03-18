@@ -11,7 +11,12 @@ async function pinToIPFS(pkg: DAppNodePackageVersion) {
     });
     console.log(`Pinned ${pkg.name} with hash: ${pkg.hash}`);
   } catch (e) {
-    console.log("Could not pin", pkg.name, e);
+    if (axios.isAxiosError(e)) {
+      console.log(`Could not pin ${pkg.name}: ${e.message}`, 
+        e.response?.data ? `Response: ${JSON.stringify(e.response.data)}` : '');
+    } else {
+      console.log(`Could not pin ${pkg.name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 }
 
